@@ -1,0 +1,10 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+
+# Base vectorielle locale (se recrée à l'indexation)
+data/chroma/
+
+# Réglages personnels de l'éditeur
+.vscode/
