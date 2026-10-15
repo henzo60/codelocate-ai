@@ -1,0 +1,6 @@
+chromadb
+fastapi
+uvicorn
+ollama
+streamlit
+rank-bm25
