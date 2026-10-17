@@ -9,7 +9,7 @@ import time
 import ollama
 
 import config
-from recherche.semantique import rechercher_par_sens
+from recherche.hybride import rechercher_hybride
 
 TAILLE_CONTEXTE = 8192  # nombre de tokens que le modèle peut lire en une fois
 PHRASE_INCONNU = "Je ne sais pas : le code fourni ne contient pas la réponse."
@@ -96,17 +96,34 @@ def sources_citees(texte, resultats):
     return cites or resultats
 
 
-def repondre(question):
-    """Pose la question au chatbot et retourne la réponse, ses sources et sa durée."""
-    depart = time.perf_counter()
-    resultats = rechercher_par_sens(question)
-    messages = construire_messages(question, assembler_contexte(resultats))
-    reponse = ollama.chat(
+def interroger_modele(messages, en_direct=False):
+    """Envoie les messages à Qwen2.5-Coder et retourne sa réponse.
+
+    En direct (streaming), le texte s'affiche au fur et à mesure qu'il est écrit.
+    """
+    morceaux = []
+    flux = ollama.chat(
         model=config.MODELE_LLM,
         messages=messages,
         options={"temperature": 0.1, "num_ctx": TAILLE_CONTEXTE},
+        stream=True,
     )
-    texte = reponse["message"]["content"].strip()
+    for partie in flux:
+        texte = partie["message"]["content"]
+        morceaux.append(texte)
+        if en_direct:
+            print(texte, end="", flush=True)
+    if en_direct:
+        print()
+    return "".join(morceaux).strip()
+
+
+def repondre(question, en_direct=False):
+    """Pose la question au chatbot et retourne la réponse, ses sources et sa durée."""
+    depart = time.perf_counter()
+    resultats = rechercher_hybride(question)
+    messages = construire_messages(question, assembler_contexte(resultats))
+    texte = interroger_modele(messages, en_direct)
     return {
         "question": question,
         "reponse": texte,
@@ -116,8 +133,10 @@ def repondre(question):
     }
 
 
-def afficher(resultat):
-    print(resultat["reponse"])
+def afficher(resultat, reponse_deja_affichee=False):
+    """Affiche la réponse (sauf si elle est déjà apparue en direct), puis ses sources."""
+    if not reponse_deja_affichee:
+        print(resultat["reponse"])
     if resultat["sources"]:
         print("\nSources :")
         for s in resultat["sources"]:
@@ -129,4 +148,4 @@ def afficher(resultat):
 if __name__ == "__main__":
     question = " ".join(sys.argv[1:]) or input("Question : ")
     print(f"Question : {question}\n")
-    afficher(repondre(question))
+    afficher(repondre(question, en_direct=True), reponse_deja_affichee=True)
