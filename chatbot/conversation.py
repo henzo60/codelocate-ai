@@ -17,7 +17,7 @@ from chatbot.reponse import (
     interroger_modele,
     sources_citees,
 )
-from recherche.hybride import rechercher_hybride
+from outils.routeur import preparer_contexte
 
 MAX_ECHANGES = 3  # nombre d'échanges précédents gardés en mémoire
 MAX_CARACTERES_HISTORIQUE = 6000  # environ 1 500 tokens, pour laisser la place au code
@@ -74,7 +74,7 @@ class Conversation:
         question_recherche = self.question_autonome(question)
         if en_direct and question_recherche != question:
             print(f"(question comprise comme : {question_recherche})\n")
-        resultats = rechercher_hybride(question_recherche)
+        resultats, texte_outil = preparer_contexte(question_recherche)
 
         messages = [{"role": "system", "content": PROMPT_SYSTEME}]
         for ancienne_question, ancienne_reponse in self.historique():
@@ -84,7 +84,7 @@ class Conversation:
             {
                 "role": "user",
                 "content": (
-                    f"Extraits de code :\n\n{assembler_contexte(resultats)}\n\n"
+                    f"Extraits de code :\n\n{assembler_contexte(resultats, texte_outil)}\n\n"
                     f"Question : {question_recherche}\n\n{RAPPEL_FORMAT}"
                 ),
             }

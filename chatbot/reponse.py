@@ -9,7 +9,7 @@ import time
 import ollama
 
 import config
-from recherche.hybride import rechercher_hybride
+from outils.routeur import preparer_contexte
 
 TAILLE_CONTEXTE = 8192  # nombre de tokens que le modèle peut lire en une fois
 PHRASE_INCONNU = "Je ne sais pas : le code fourni ne contient pas la réponse."
@@ -23,6 +23,8 @@ Règles à respecter absolument :
    Les numéros de ligne sont écrits au début de chaque ligne de code : utilise-les.
 3. Si les extraits ne permettent pas de répondre, réponds uniquement : « {PHRASE_INCONNU} »
 4. Réponds en français, de façon claire et concise (10 phrases maximum).
+5. Si une section « Résultats de l'outil d'analyse » est fournie, elle est exacte et complète :
+   appuie-toi d'abord sur elle, recopie ses chiffres sans les modifier et cite ses sources.
 
 Exemple de réponse bien citée :
 La pénalité est gratuite pendant les premiers jours de retard [services/penalites.py:12-14],
@@ -54,9 +56,12 @@ def code_numerote(resultat):
     )
 
 
-def assembler_contexte(resultats):
-    """Met bout à bout les morceaux trouvés, chacun précédé de son fichier et de ses lignes."""
-    blocs = []
+def assembler_contexte(resultats, texte_outil=""):
+    """Met bout à bout les morceaux trouvés, chacun précédé de son fichier et de ses lignes.
+
+    Si un outil a calculé un résultat exact, il est placé en premier.
+    """
+    blocs = [f"### Résultats de l'outil d'analyse (exacts)\n{texte_outil}"] if texte_outil else []
     for r in resultats:
         blocs.append(
             f"### Fichier {r['fichier']}, lignes {r['ligne_debut']}-{r['ligne_fin']} "
@@ -121,8 +126,8 @@ def interroger_modele(messages, en_direct=False):
 def repondre(question, en_direct=False):
     """Pose la question au chatbot et retourne la réponse, ses sources et sa durée."""
     depart = time.perf_counter()
-    resultats = rechercher_hybride(question)
-    messages = construire_messages(question, assembler_contexte(resultats))
+    resultats, texte_outil = preparer_contexte(question)
+    messages = construire_messages(question, assembler_contexte(resultats, texte_outil))
     texte = interroger_modele(messages, en_direct)
     return {
         "question": question,
